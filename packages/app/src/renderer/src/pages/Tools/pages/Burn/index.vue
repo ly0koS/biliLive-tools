@@ -80,6 +80,10 @@ import { cloneDeep } from "lodash-es";
 import { FolderOpenOutline } from "@vicons/ionicons5";
 import { supportedVideoExtensions } from "@renderer/utils";
 
+defineOptions({
+  name: "Convert2Mp4",
+});
+
 const notice = useNotification();
 const confirm = useConfirm();
 const { appConfig } = storeToRefs(useAppConfig());
