@@ -4,11 +4,16 @@
     v-model="fileList"
     :sort="props.sort"
     :placeholder="props.inputPlaceholder"
-    @add-danmaku="addDanmaku"
-  ></PartArea>
+    @add-subFile="addSubFile"
+  >
+    <template #subFileOn> <slot name="subFileOn"></slot> </template>
+    <template #subFileOff>
+      <slot name="subFileOff"></slot>
+    </template>
+  </PartArea>
   <FileArea
     v-else
-    :extensions="props.extensions"
+    :extensions="extensions"
     :desc="props.areaPlaceholder"
     @change="addOldFile"
   ></FileArea>
@@ -25,8 +30,8 @@ const fileList = defineModel<
   {
     id: string;
     title: string;
-    videoPath: string;
-    danmakuPath?: string;
+    mainFilePath: string;
+    subFilePath?: string;
   }[]
 >({ required: true });
 
@@ -35,23 +40,23 @@ const props = withDefaults(
     sort?: boolean;
     inputPlaceholder?: string;
     areaPlaceholder?: string;
-    extensions?: string[];
+    mainExtensions?: string[];
+    subExtensions?: string[];
   }>(),
   {
     sort: true,
     inputPlaceholder: "请输入",
     areaPlaceholder: "请选择视频文件",
-    extensions: () => supportedVideoExtensions,
+    mainExtensions: () => supportedVideoExtensions,
+    subExtensions: () => [],
   },
 );
 
+const extensions = computed(() => {
+  return [...props.mainExtensions, ...props.subExtensions];
+});
+
 const addOldFile = (data: { name: string; path: string }[]) => {
-  // fileList.value = data.map((item) => ({
-  //   id: uuid(),
-  //   title: item.name,
-  //   videoPath: item.path,
-  //   danmakuPath: "",
-  // }));
   handleFiles(data.map((item) => item.path));
 };
 
@@ -61,7 +66,7 @@ const select = async () => {
     files = await showDirectoryDialog({
       type: "file",
       multi: true,
-      exts: props.extensions,
+      exts: extensions.value,
     });
   } else {
     files = await window.api.openFile({
@@ -69,7 +74,7 @@ const select = async () => {
       filters: [
         {
           name: "file",
-          extensions: props.extensions,
+          extensions: extensions.value,
         },
         {
           name: "所有文件",
@@ -89,7 +94,7 @@ const handleFiles = (files: string[]) => {
   const danmuFiles: string[] = [];
   const videoFiles: string[] = [];
   files.forEach((file) => {
-    if (file.endsWith(".xml") || file.endsWith(".ass")) {
+    if (props.subExtensions.some((ext) => file.endsWith(ext))) {
       danmuFiles.push(file);
     } else {
       videoFiles.push(file);
@@ -98,13 +103,13 @@ const handleFiles = (files: string[]) => {
 
   const newFiles = videoFiles
     .filter((file) => {
-      return !fileList.value.some((item) => item.videoPath === file);
+      return !fileList.value.some((item) => item.mainFilePath === file);
     })
     .map((file) => ({
       id: uuid(),
       title: window.path.parse(file).name,
-      videoPath: file,
-      danmakuPath: "",
+      mainFilePath: file,
+      subFilePath: "",
     }));
 
   const allFiles = fileList.value.concat(newFiles);
@@ -117,12 +122,12 @@ const handleFiles = (files: string[]) => {
 
   if (danmuItems) {
     allFiles.forEach((item) => {
-      if (item.danmakuPath) return;
-      const videoName = window.path.parse(item.videoPath).name;
+      if (item.subFilePath) return;
+      const videoName = window.path.parse(item.mainFilePath).name;
 
       const danmuItem = danmuItems.find((item) => item.name === videoName);
       if (danmuItem) {
-        item.danmakuPath = danmuItem.path;
+        item.subFilePath = danmuItem.path;
       }
     });
   }
@@ -130,14 +135,13 @@ const handleFiles = (files: string[]) => {
   fileList.value = allFiles;
 };
 
-const addDanmaku = async (index: number) => {
+const addSubFile = async (index: number) => {
   let files: string[] | undefined = [];
-  const extensions = ["xml", "ass"];
   if (window.isWeb) {
     files = await showDirectoryDialog({
       type: "file",
       multi: false,
-      exts: extensions,
+      exts: props.subExtensions,
     });
   } else {
     files = await window.api.openFile({
@@ -145,7 +149,7 @@ const addDanmaku = async (index: number) => {
       filters: [
         {
           name: "file",
-          extensions: extensions,
+          extensions: props.subExtensions,
         },
         {
           name: "所有文件",
@@ -159,7 +163,7 @@ const addDanmaku = async (index: number) => {
   if (!files) return;
   if (files.length === 0) return;
 
-  fileList.value[index].danmakuPath = files[0];
+  fileList.value[index].subFilePath = files[0];
 };
 
 defineExpose({

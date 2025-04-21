@@ -86,7 +86,11 @@ const router = createRouter({
           path: "/liveHistory",
           name: "LiveHistory",
           component: () => import("../pages/LiveHistory/index.vue"),
-          meta: { keepAlive: false },
+        },
+        {
+          path: "/tools/danmu-merge",
+          name: "DanmuMerge",
+          component: () => import("../pages/Tools/pages/DanmuMerge/index.vue"),
         },
       ],
     },

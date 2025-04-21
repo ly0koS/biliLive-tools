@@ -32,7 +32,8 @@
       ref="fileSelect"
       v-model="fileList"
       :sort="false"
-      :extensions="[...supportedVideoExtensions, 'xml', 'ass']"
+      :main-extensions="supportedVideoExtensions"
+      :sub-extensions="['xml', 'ass']"
     ></FileSelect>
 
     <div class="flex align-center column" style="margin-top: 10px">
@@ -85,7 +86,9 @@ const { appConfig } = storeToRefs(useAppConfig());
 const { ffmpegOptions } = storeToRefs(useFfmpegPreset());
 const { danmuPresetsOptions } = storeToRefs(useDanmuPreset());
 
-const fileList = ref<{ id: string; title: string; videoPath: string; danmakuPath?: string }[]>([]);
+const fileList = ref<{ id: string; title: string; mainFilePath: string; subFilePath?: string }[]>(
+  [],
+);
 const options = toReactive(
   computed({
     get: () => appConfig.value.tool.video2mp4,
@@ -142,7 +145,7 @@ const convert = async () => {
 
   // 如果存在弹幕，那么不允许使用copy
   if (ffmpegOptions.encoder === "copy") {
-    if (fileList.value.find((item) => item.danmakuPath)) {
+    if (fileList.value.find((item) => item.subFilePath)) {
       notice.error({
         title: `存在弹幕文件，视频预设编码器不允许使用 copy 选项`,
         duration: 1500,
@@ -164,21 +167,21 @@ const convert = async () => {
   const files = cloneDeep(fileList.value);
 
   for (let i = 0; i < files.length; i++) {
-    const videoPath = files[i].videoPath;
-    const danmakuPath = files[i].danmakuPath;
+    const mainFilePath = files[i].mainFilePath;
+    const subFilePath = files[i].subFilePath;
     const outputName = `${files[i].title}.mp4`;
-    if (!danmakuPath && options.hotProgress) {
+    if (!subFilePath && options.hotProgress) {
       notice.error({
         title: `未选择弹幕文件，无法使用高能进度条`,
         duration: 1500,
       });
       return;
     }
-    if (danmakuPath) {
+    if (subFilePath) {
       await taskApi.burn(
         {
-          videoFilePath: videoPath,
-          subtitleFilePath: danmakuPath,
+          videoFilePath: mainFilePath,
+          subtitleFilePath: subFilePath,
         },
         outputName,
         {
@@ -198,7 +201,7 @@ const convert = async () => {
         },
       );
     } else {
-      await taskApi.transcode(videoPath, outputName, ffmpegOptions, {
+      await taskApi.transcode(mainFilePath, outputName, ffmpegOptions, {
         override: options.override,
         removeOrigin: options.removeOrigin,
         savePath: options.savePath,

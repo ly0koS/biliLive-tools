@@ -52,6 +52,7 @@
               'User',
               'About',
               'FileSync',
+              'DanmuMerge',
             ]"
           >
             <component :is="Component" />
@@ -283,6 +284,10 @@ const menuOptions = computed<MenuOption[]>(() => {
           },
           { default: () => "视频合并" },
         ),
+    },
+    {
+      key: "DanmuMerge",
+      label: () => h(RouterLink, { to: { name: "DanmuMerge" } }, { default: () => "弹幕合并" }),
     },
     {
       key: "BiliDownload",

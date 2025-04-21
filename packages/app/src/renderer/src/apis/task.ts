@@ -189,6 +189,14 @@ const downloadVideo = async (data: VideoAPI["downloadVideo"]["Args"]) => {
   return res.data;
 };
 
+const mergeDanmu = async (inputs: string[], output: string) => {
+  const res = await request.post(`/task/mergeDanmu`, {
+    inputs,
+    output,
+  });
+  return res.data;
+};
+
 const task = {
   list,
   get,
@@ -208,6 +216,7 @@ const task = {
   readVideoMeta,
   parseVideo,
   downloadVideo,
+  mergeDanmu,
 };
 
 export default task;
