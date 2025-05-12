@@ -148,43 +148,43 @@ const footerMenuOptions = computed<MenuOption[]>(() => {
     key: string;
     icon?: () => VNode;
   }[] = [];
-  if (isWeb.value) {
-    menus.push({
-      label: () =>
-        h(
-          "a",
-          {
-            onClick: () => {
-              window.localStorage.setItem("key", "");
-              router.push({ name: "Login" });
-            },
-            // style: {
-            //   marginLeft: "25px",
-            // },
+  // if (isWeb.value) {
+  menus.push({
+    label: () =>
+      h(
+        "a",
+        {
+          onClick: () => {
+            window.localStorage.setItem("key", "");
+            router.push({ name: "Login" });
           },
-          { default: () => "登出" },
-        ),
-      key: "log",
-      icon: renderIcon(LogOutOutline),
-    });
-    menus.push({
-      label: () =>
-        h(
-          "a",
-          {
-            onClick: () => {
-              logVisible.value = true;
-            },
-            // style: {
-            //   marginLeft: "25px",
-            // },
+          // style: {
+          //   marginLeft: "25px",
+          // },
+        },
+        { default: () => "登出" },
+      ),
+    key: "log",
+    icon: renderIcon(LogOutOutline),
+  });
+  menus.push({
+    label: () =>
+      h(
+        "a",
+        {
+          onClick: () => {
+            logVisible.value = true;
           },
-          { default: () => "日志" },
-        ),
-      key: "log",
-      icon: renderIcon(logSvg),
-    });
-  }
+          // style: {
+          //   marginLeft: "25px",
+          // },
+        },
+        { default: () => "日志" },
+      ),
+    key: "log",
+    icon: renderIcon(logSvg),
+  });
+  // }
   menus.push(
     ...[
       {

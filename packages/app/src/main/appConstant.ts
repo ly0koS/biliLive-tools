@@ -46,7 +46,7 @@ export let FFMPEG_PATH = join(binPath, "ffmpeg.exe");
 export let FFPROBE_PATH = join(binPath, "ffprobe.exe");
 export let DANMUKUFACTORY_PATH = join(binPath, "DanmakuFactory.exe");
 
-if (process.platform === "linux") {
+if (process.platform === "linux" || process.platform === "darwin") {
   FFMPEG_PATH = join(binPath, "ffmpeg");
   FFPROBE_PATH = join(binPath, "ffprobe");
   DANMUKUFACTORY_PATH = join(binPath, "DanmakuFactory");

@@ -131,7 +131,7 @@ function generateConfig(configPath: string) {
     if (fs.existsSync(configFolder)) {
       defaultConfig.configFolder = configFolder;
     }
-  } else if (process.platform === "linux") {
+  } else if (process.platform === "linux" || process.platform === "darwin") {
     defaultConfig.ffmpegPath = "ffmpeg";
     defaultConfig.ffprobePath = "ffprobe";
     defaultConfig.danmakuFactoryPath = "DanmakuFactory";
