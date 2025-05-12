@@ -148,25 +148,26 @@ const footerMenuOptions = computed<MenuOption[]>(() => {
     key: string;
     icon?: () => VNode;
   }[] = [];
-  // if (isWeb.value) {
-  menus.push({
-    label: () =>
-      h(
-        "a",
-        {
-          onClick: () => {
-            window.localStorage.setItem("key", "");
-            router.push({ name: "Login" });
+  if (isWeb.value) {
+    menus.push({
+      label: () =>
+        h(
+          "a",
+          {
+            onClick: () => {
+              window.localStorage.setItem("key", "");
+              router.push({ name: "Login" });
+            },
+            // style: {
+            //   marginLeft: "25px",
+            // },
           },
-          // style: {
-          //   marginLeft: "25px",
-          // },
-        },
-        { default: () => "登出" },
-      ),
-    key: "log",
-    icon: renderIcon(LogOutOutline),
-  });
+          { default: () => "登出" },
+        ),
+      key: "log",
+      icon: renderIcon(LogOutOutline),
+    });
+  }
   menus.push({
     label: () =>
       h(
@@ -184,7 +185,6 @@ const footerMenuOptions = computed<MenuOption[]>(() => {
     key: "log",
     icon: renderIcon(logSvg),
   });
-  // }
   menus.push(
     ...[
       {
