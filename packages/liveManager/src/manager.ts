@@ -259,9 +259,17 @@ export function createRecorderManager<
       recorder.on("videoFileCompleted", ({ filename }) =>
         this.emit("videoFileCompleted", { recorder: recorder.toJSON(), filename }),
       );
+      recorder.on("Message", (message) =>
+        this.emit("Message", { recorder: recorder.toJSON(), message }),
+      );
+      recorder.on("Updated", (keys) =>
+        this.emit("RecorderUpdated", { recorder: recorder.toJSON(), keys }),
+      );
+      recorder.on("DebugLog", (log) =>
+        this.emit("RecorderDebugLog", { recorder: recorder, ...log }),
+      );
       recorder.on("RecordStop", ({ recordHandle, reason }) => {
         this.emit("RecordStop", { recorder: recorder.toJSON(), recordHandle, reason });
-
         // 如果reason中存在"invalid stream"，说明直播由于某些原因中断了，虽然会在下一次周期检查中继续，但是会遗漏一段时间。
         // 这时候可以触发一次检查，但出于直播可能抽风的原因，为避免风控，一场直播最多触发五次。
         // 测试阶段，还需要一个开关，默认关闭，几个版本后转正使用
@@ -298,15 +306,6 @@ export function createRecorderManager<
           }, 1000);
         }
       });
-      recorder.on("Message", (message) =>
-        this.emit("Message", { recorder: recorder.toJSON(), message }),
-      );
-      recorder.on("Updated", (keys) =>
-        this.emit("RecorderUpdated", { recorder: recorder.toJSON(), keys }),
-      );
-      recorder.on("DebugLog", (log) =>
-        this.emit("RecorderDebugLog", { recorder: recorder, ...log }),
-      );
       recorder.on("progress", (progress) => {
         this.emit("RecorderProgress", { recorder: recorder.toJSON(), progress });
       });

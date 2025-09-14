@@ -943,6 +943,7 @@ export interface GlobalConfig {
   logPath: string;
   defaultFfmpegPath: string;
   defaultFfprobePath: string;
+  defaultMesioPath: string;
   defaultDanmakuFactoryPath: string;
   version: string;
   userDataPath: string;
