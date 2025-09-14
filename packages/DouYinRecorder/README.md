@@ -47,6 +47,7 @@ interface Options {
   doubleScreen?: boolean; // 是否使用双屏直播流，开启后如果是双屏直播，那么就使用拼接的流，默认为true
   auth?: string; // 传递cookie，用于录制会员视频
   recorderType?: "ffmpeg" | "mesio"; // 底层录制器，使用mesio时videoFormat参数无效
+  api?: "web" | "webHTML"; // 使用不同的接口
 }
 ```
 

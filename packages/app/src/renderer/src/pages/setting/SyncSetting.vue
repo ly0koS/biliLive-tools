@@ -4,7 +4,14 @@
       <h2 style="display: inline-flex; align-items: center">
         文件同步配置<Tip :size="22">配置完成去webhook配置中配置相关同步器</Tip>
       </h2>
-      <p>使用前请务必了解相关同步库并<bold>仔细查看文档</bold></p>
+      <p>
+        使用前请务必了解相关同步库并<b>仔细查看文档</b>，或查看<a
+          href="https://www.bilibili.com/video/BV1DieEzgE7y/"
+          class="external"
+          target="_blank"
+          >视频教程</a
+        >
+      </p>
     </div>
 
     <n-form label-placement="left" :label-width="145">
@@ -471,7 +478,6 @@ const loginCheck = async (type: SyncType) => {
   } else if (type === "pan123") {
     status = await syncApi.syncTestLogin({
       clientId: config.value.sync.pan123.clientId,
-      clientSecret: config.value.sync.pan123.clientSecret,
       type: "pan123",
     });
   } else {
@@ -481,7 +487,7 @@ const loginCheck = async (type: SyncType) => {
   if (status) {
     notice.success("已存在登录信息");
   } else {
-    notice.error("未检测到登录信息，请先登录");
+    notice.error("未检测到登录信息或凭证已过期，请登录");
   }
 };
 
