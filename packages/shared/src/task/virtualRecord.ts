@@ -52,21 +52,44 @@ const checkFolder = async (config: VirtualRecordConfig, folderPath: string, star
   // 筛选出mp4,ts,flv,mkv后缀的文件
   const videoFiles = files
     .filter((file) => /\.(mp4|ts|flv|mkv)$/.test(file))
+    .filter((file) => {
+      // 如果配置了忽略文件规则，则过滤掉匹配的文件
+      if (config.ignoreFileRegex) {
+        try {
+          const ignoreRegex = new RegExp(config.ignoreFileRegex);
+          if (ignoreRegex.test(file)) {
+            logger.debug(`文件被忽略规则匹配，跳过: ${file}`);
+            return false;
+          }
+        } catch (error) {
+          logger.error(`忽略文件正则表达式解析失败: ${config.ignoreFileRegex}`, error);
+        }
+      }
+      return true;
+    })
     .map((file) => {
       return path.join(folderPath, file);
     });
 
   if (videoFiles.length === 0) {
-    logger.debug(`没有找到符合条件的文件：${folderPath}`);
+    // logger.debug(`没有找到符合条件的文件：${folderPath}`);
     return;
   }
 
-  const stats = await Promise.allSettled(videoFiles.map((file) => fs.stat(file)));
+  // 读取数据库，排除掉已存在的记录
+  const existingRecords = virtualRecordModel.list();
+  const existingPathSets = new Set(existingRecords.map((item) => item.path));
+  const unprocessedFiles = videoFiles.filter((file) => !existingPathSets.has(file));
 
-  const validFiles: FileInfo[] = stats
+  if (unprocessedFiles.length === 0) {
+    return;
+  }
+
+  const stats = await Promise.allSettled(unprocessedFiles.map((file) => fs.stat(file)));
+  const newRecords: FileInfo[] = stats
     .map((item, index) => {
       return {
-        path: videoFiles[index],
+        path: unprocessedFiles[index],
         ...item,
       };
     })
@@ -89,18 +112,8 @@ const checkFolder = async (config: VirtualRecordConfig, folderPath: string, star
       return a.birthtimeMs - b.birthtimeMs;
     });
 
-  if (validFiles.length === 0) {
-    logger.debug(`没有找到符合条件的新文件：${folderPath}`);
-    return;
-  }
-
-  // 读取数据库，排除掉已存在的记录
-  const existingRecords = virtualRecordModel.list();
-  const existingPathSets = new Set(existingRecords.map((item) => item.path));
-  const newRecords = validFiles.filter((file) => !existingPathSets.has(file.path));
-
   if (newRecords.length === 0) {
-    logger.debug(`没有新的未处理文件：${folderPath}`);
+    // logger.debug(`没有找到符合条件的新文件：${folderPath}`);
     return;
   }
 
@@ -230,7 +243,7 @@ async function checkVirtualRecordLoop() {
   } catch (error) {
     logger.error("虚拟录制检查失败", error);
   } finally {
-    setTimeout(checkVirtualRecordLoop, 1 * 60 * 1000);
+    setTimeout(checkVirtualRecordLoop, 2 * 60 * 1000);
   }
 }
 
@@ -238,7 +251,6 @@ async function checkVirtualRecordLoop() {
  * 启动虚拟录制检查
  */
 export async function check() {
-  logger.info("启动虚拟录制检查服务");
   // 默认使用轮询方式实现
   checkVirtualRecordLoop();
   // TODO: 之后可能采取 watch 方式实现
