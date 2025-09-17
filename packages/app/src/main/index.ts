@@ -91,6 +91,7 @@ const genHandler = (ipcMain: IpcMain) => {
   ipcMain.handle("common:relaunch", relaunch);
   ipcMain.handle("common:setOpenAtLogin", setOpenAtLogin);
   ipcMain.handle("common:setTheme", setTheme);
+  ipcMain.handle("common:checkUpdate", manualCheckUpdate);
 
   registerHandlers(ipcMain, ffmpegHandlers);
   registerHandlers(ipcMain, configHandlers);
@@ -506,14 +507,6 @@ if (!gotTheLock) {
     log.error("=== 未捕获异常 (Uncaught Exception) ===");
     log.error("错误信息:", error.message);
     log.error("错误堆栈:", error.stack);
-    log.error("错误名称:", error.name);
-    log.error("错误代码:", (error as any).code);
-    log.error("内存使用:", {
-      rss: process.memoryUsage().rss,
-      heapTotal: process.memoryUsage().heapTotal,
-      heapUsed: process.memoryUsage().heapUsed,
-      external: process.memoryUsage().external,
-    });
 
     if (error.message.includes("listen EADDRINUSE")) {
       setTimeout(() => {
@@ -748,4 +741,25 @@ const checkUpdate = async () => {
     return false;
   }
   return true;
+};
+
+const manualCheckUpdate = async () => {
+  try {
+    const status = await checkUpdate();
+    if (status) {
+      dialog.showMessageBox(mainWin, {
+        message: "当前已经是最新版本",
+        buttons: ["确认"],
+      });
+    }
+  } catch (error) {
+    log.error(error);
+    const confirm = await dialog.showMessageBox(mainWin, {
+      message: "检查更新失败，请前往仓库查看",
+      buttons: ["取消", "确认"],
+    });
+    if (confirm.response === 1) {
+      shell.openExternal("https://github.com/renmu123/biliLive-tools/releases");
+    }
+  }
 };

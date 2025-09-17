@@ -1,12 +1,13 @@
 import path from "node:path";
+import http from "node:http";
+import https from "node:https";
+import { URL } from "node:url";
 
 import fs from "fs-extra";
+import Throttle from "@renmu/throttle";
 import logger from "../utils/log.js";
 import { TypedEmitter } from "tiny-typed-emitter";
 import axios, { AxiosInstance } from "axios";
-import * as http from "http";
-import * as https from "https";
-import { URL } from "url";
 
 export interface AlistOptions {
   /**
@@ -37,6 +38,11 @@ export interface AlistOptions {
    * 日志记录器
    */
   logger?: typeof logger;
+  /**
+   * 速率限制，单位KB/s，0为不限速
+   * @default 0
+   */
+  limitRate?: number;
 }
 
 interface AlistEvents {
@@ -66,6 +72,9 @@ export class Alist extends TypedEmitter<AlistEvents> {
   private token: string | null = null;
   private client: AxiosInstance;
   private abortController: AbortController | null = null;
+  private limitRate: number;
+  private progressHistory: Array<{ loaded: number; timestamp: number }> = [];
+  private readonly speedWindowMs: number = 3000; // 3秒时间窗口
 
   constructor(options?: AlistOptions) {
     super();
@@ -74,6 +83,7 @@ export class Alist extends TypedEmitter<AlistEvents> {
     this.password = options?.password || "";
     this.remotePath = options?.remotePath || "/录播";
     this.logger = options?.logger || logger;
+    this.limitRate = options?.limitRate || 0;
 
     // 创建axios实例
     this.client = axios.create({
@@ -215,6 +225,8 @@ export class Alist extends TypedEmitter<AlistEvents> {
       this.logger.info("取消上传操作");
       this.abortController.abort();
       this.abortController = null;
+      // 重置进度追踪
+      this.progressHistory = [];
     }
   }
 
@@ -259,30 +271,31 @@ export class Alist extends TypedEmitter<AlistEvents> {
     const fileSize = stat.size;
 
     // 创建文件流
-    const fileStream = fs.createReadStream(localFilePath, {
+    let fileStream = fs.createReadStream(localFilePath, {
       highWaterMark: 1024 * 1024, // 每次读取 1MB
     });
 
+    if (this.limitRate > 0) {
+      fileStream = fileStream.pipe(new Throttle(this.limitRate * 1024));
+    }
+
     // 进度监听
     let uploaded = 0;
-    let lastUploaded = 0;
-    let lastTime = Date.now();
+    const uploadStartTime = Date.now();
+    this.progressHistory = [{ loaded: 0, timestamp: uploadStartTime }];
+
     fileStream.on("data", (chunk) => {
       uploaded += chunk.length;
-      const now = Date.now();
-      const timeDiff = (now - lastTime) / 1000; // 秒
-      let speedStr = "";
-      if (timeDiff > 0) {
-        const speed = (uploaded - lastUploaded) / timeDiff; // B/s
-        speedStr = this.formatSize(speed) + "/s";
-        lastUploaded = uploaded;
-        lastTime = now;
-      }
+      const currentTime = Date.now();
+
+      // 计算上传速度（使用时间窗口平滑）
+      const speed = this.calculateSpeed(uploaded, currentTime);
+
       this.emit("progress", {
         uploaded: this.formatSize(uploaded),
         total: this.formatSize(fileSize),
         percentage: Math.round((uploaded / fileSize) * 100),
-        speed: speedStr,
+        speed,
       });
     });
 
@@ -308,12 +321,12 @@ export class Alist extends TypedEmitter<AlistEvents> {
           {
             method: "PUT",
             hostname: url.hostname,
-            port: url.port ? Number(url.port) : (url.protocol === "https:" ? 443 : 80),
+            port: url.port ? Number(url.port) : url.protocol === "https:" ? 443 : 80,
             path: url.pathname,
             headers: {
               "Content-Type": "application/octet-stream",
               "Content-Length": fileSize.toString(),
-              ...(this.token ? { "Authorization": this.token } : {}),
+              ...(this.token ? { Authorization: this.token } : {}),
               "File-Path": encodeURIComponent(remotePath),
               "As-Task": "true",
             },
@@ -342,7 +355,7 @@ export class Alist extends TypedEmitter<AlistEvents> {
                 reject(err);
               }
             });
-          }
+          },
         );
         req.on("error", (error: any) => {
           reject(error);
@@ -354,12 +367,14 @@ export class Alist extends TypedEmitter<AlistEvents> {
         this.logger.info("上传已取消");
         this.emit("canceled", "上传已取消");
       } else {
-        this.logger.error(`上传文件出错: ${error?.message || 'unknown error'}`);
+        this.logger.error(`上传文件出错: ${error?.message || "unknown error"}`);
         this.emit("error", error);
       }
       throw error;
     } finally {
       this.abortController = null;
+      // 重置进度追踪
+      this.progressHistory = [];
     }
   }
 
@@ -378,5 +393,49 @@ export class Alist extends TypedEmitter<AlistEvents> {
     } else {
       return `${(size / 1024 / 1024 / 1024).toFixed(2)}GB`;
     }
+  }
+
+  /**
+   * 清理超出时间窗口的历史记录
+   * @param currentTime 当前时间戳
+   */
+  private cleanupProgressHistory(currentTime: number): void {
+    const windowStartTime = currentTime - this.speedWindowMs;
+    this.progressHistory = this.progressHistory.filter(
+      (progress) => progress.timestamp >= windowStartTime,
+    );
+  }
+
+  /**
+   * 计算上传速度（使用时间窗口平滑）
+   * @param currentLoaded 当前已上传字节数
+   * @param currentTime 当前时间戳
+   * @returns 格式化的速度字符串（MB/s）
+   */
+  private calculateSpeed(currentLoaded: number, currentTime: number): string {
+    // 添加当前进度到历史记录
+    this.progressHistory.push({ loaded: currentLoaded, timestamp: currentTime });
+
+    // 清理超出时间窗口的旧数据
+    this.cleanupProgressHistory(currentTime);
+
+    // 如果历史记录不足，返回默认值
+    if (this.progressHistory.length < 2) {
+      return "0.00 MB/s";
+    }
+
+    // 使用时间窗口内的第一个和最后一个数据点计算平均速度
+    const oldest = this.progressHistory[0];
+    const newest = this.progressHistory[this.progressHistory.length - 1];
+
+    const timeDiff = (newest.timestamp - oldest.timestamp) / 1000; // 转换为秒
+    const dataDiff = newest.loaded - oldest.loaded; // 字节差
+
+    if (timeDiff <= 0 || dataDiff <= 0) {
+      return "0.00 MB/s";
+    }
+
+    const speedMBps = dataDiff / (1024 * 1024) / timeDiff; // MB/s
+    return `${speedMBps.toFixed(2)} MB/s`;
   }
 }

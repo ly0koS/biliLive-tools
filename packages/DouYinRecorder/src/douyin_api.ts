@@ -1,3 +1,4 @@
+import { URL, URLSearchParams } from "url";
 import axios from "axios";
 import { isEmpty } from "lodash-es";
 import { assert, get__ac_signature } from "./utils.js";
@@ -22,6 +23,14 @@ const requester = axios.create({
 export async function resolveShortURL(shortURL: string): Promise<string> {
   // 获取跳转后的页面内容
   const response = await requester.get(shortURL);
+  const redirectedURL = response.request.res.responseUrl;
+  if (redirectedURL.includes("/user/")) {
+    const secUid = new URL(redirectedURL).searchParams.get("sec_uid");
+    if (!secUid) {
+      throw new Error("无法从短链接解析出直播间ID");
+    }
+    return parseUser(`https://www.douyin.com/user/${secUid}`);
+  }
 
   // 尝试从页面内容中提取webRid
   const webRidMatch = response.data.match(/"webRid\\":\\"(\d+)\\"/);
@@ -374,6 +383,24 @@ export async function getRoomInfo(
 }
 
 /**
+ * 获取nonce
+ */
+async function getNonce(url: string) {
+  const res = await requester.get(url);
+  if (!res.headers["set-cookie"]) {
+    throw new Error("No cookie in response");
+  }
+  const cookies = {};
+  (res.headers["set-cookie"] ?? []).forEach((cookie) => {
+    const [key, _] = cookie.split(";");
+    const [keyPart, valuePart] = key.split("=");
+    if (!keyPart || !valuePart) return;
+    cookies[keyPart.trim()] = valuePart.trim();
+  });
+  return cookies["__ac_nonce"];
+}
+
+/**
  * 解析抖音号
  * @param url
  */
@@ -381,7 +408,7 @@ export async function parseUser(url: string) {
   const timestamp = Math.floor(Date.now() / 1000);
   const ua =
     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/133.0.0.0 Safari/537.36 Edg/133.0.0.0";
-  const nonce = generateNonce();
+  const nonce = (await getNonce(url)) ?? generateNonce();
   const signed = get__ac_signature(timestamp, url, nonce, ua);
 
   const res = await requester.get(url, {

@@ -572,10 +572,12 @@ export interface AppConfig {
       apiUrl: string;
       username: string;
       hashPassword: string;
+      limitRate: number; // KB
     };
     pan123: {
       clientId: string;
       clientSecret: string;
+      limitRate: number; // KB
     };
     syncConfigs: SyncConfig[];
   };
